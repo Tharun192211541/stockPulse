@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: StockPulse
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.zycus.StockPulse: DEBUG
+
+# Demand spike configuration
+demand:
+  spike:
+    multiplier: 3.0
+
+# OpenAI-compatible LiteLLM gateway. Supply LLM_API_KEY through the environment.
+llm:
+  base-url: ${LLM_BASE_URL:https://litellm-qc.zycus.net/v1}
+  api-key: ${LLM_API_KEY:}
+  model: ${LLM_MODEL:qwen-cursor}
+  product-header: ${LLM_PRODUCT_HEADER:PC1}
