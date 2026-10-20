@@ -1,0 +1,1085 @@
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <span>S</span>
+        <div class="brand-glow"></div>
+      </div>
+      <div class="brand-text">
+        <strong>StockPulse</strong>
+        <small>COMMERCE &amp; PRICING INTELLIGENCE</small>
+      </div>
+    </div>
+
+    <div class="nav-section-title">MANAGEMENT CONSOLE</div>
+    <nav class="nav-menu">
+      <button class="nav-item" [class.active]="tab === 'overview'" (click)="setTab('overview')" id="nav-overview">
+        <span class="nav-icon">▦</span>
+        <span class="nav-text">Dashboard</span>
+      </button>
+
+      <button class="nav-item" [class.active]="tab === 'products'" (click)="setTab('products')" id="nav-products">
+        <span class="nav-icon">📦</span>
+        <span class="nav-text">Product Catalog</span>
+        <span class="nav-badge" *ngIf="products.length > 0">{{ products.length }}</span>
+      </button>
+
+      <button class="nav-item" [class.active]="tab === 'pricing'" (click)="setTab('pricing')" id="nav-pricing">
+        <span class="nav-icon">🏷️</span>
+        <span class="nav-text">Pricing Suggestions</span>
+        <span class="nav-badge alert-badge" *ngIf="pendingPricingCount > 0">{{ pendingPricingCount }}</span>
+      </button>
+
+      <button class="nav-item" [class.active]="tab === 'reorder'" (click)="setTab('reorder')" id="nav-reorder">
+        <span class="nav-icon">🔄</span>
+        <span class="nav-text">Reorder Suggestions</span>
+        <span class="nav-badge alert-badge" *ngIf="pendingReorderCount > 0">{{ pendingReorderCount }}</span>
+      </button>
+
+      <button class="nav-item" [class.active]="tab === 'strategy'" (click)="setTab('strategy')" id="nav-strategy">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-text">Strategy Engine</span>
+        <span class="nav-badge strategy-badge">{{ strategy }}</span>
+      </button>
+    </nav>
+
+    <!-- Sidebar Bottom Status & Quick Config -->
+    <div class="sidebar-bottom">
+      <div class="connection-status" [class.connected]="backendConnected" [class.disconnected]="!backendConnected">
+        <span class="pulse-indicator"></span>
+        <div class="connection-meta">
+          <strong>API: {{ backendConnected ? 'Online' : 'Offline' }}</strong>
+          <small>localhost:8080</small>
+        </div>
+      </div>
+
+      <div class="quick-strategy-card">
+        <div class="strategy-card-header">
+          <span>Active Strategy</span>
+          <span class="strategy-pill" [class.ai-pill]="strategy === 'AI'">{{ strategy }}</span>
+        </div>
+        <p class="strategy-desc">
+          {{ strategy === 'AI' ? 'LLM Commerce Advisor active' : 'Deterministic Rule Engine active' }}
+        </p>
+        <button class="sidebar-strategy-link" (click)="setTab('strategy')">
+          Configure engine &rarr;
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="breadcrumb">STOCKPULSE / OPERATIONS</div>
+        <h1 class="page-title">
+          {{ tab === 'overview' ? 'Dashboard Overview' :
+             tab === 'products' ? 'Product Catalog & Inventory' :
+             tab === 'pricing' ? 'Pricing Recommendations' :
+             tab === 'reorder' ? 'Replenishment & Reorder Suggestions' :
+             'Commerce Strategy Configuration' }}
+        </h1>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="live-tag">
+          <span class="live-dot"></span>
+          <span>Live Spring Boot API</span>
+        </div>
+
+        <button class="btn btn-secondary" (click)="refreshAll()" [disabled]="loading" title="Reload all data from backend">
+          <span [class.spin]="loading">↻</span> Refresh Data
+        </button>
+
+        <button *ngIf="tab === 'products'" class="btn btn-primary" (click)="showCreateForm = !showCreateForm">
+          <span>+</span> New Product
+        </button>
+      </div>
+    </header>
+
+    <!-- Notification Toast & Alerts -->
+    <div class="toast-container" *ngIf="notice">
+      <div class="toast toast-success">
+        <span class="toast-icon">✓</span>
+        <span class="toast-body">{{ notice }}</span>
+        <button class="toast-close" (click)="notice = ''">&times;</button>
+      </div>
+    </div>
+
+    <div class="alert-banner alert-danger" *ngIf="error">
+      <span class="alert-icon">⚠️</span>
+      <div class="alert-text">{{ error }}</div>
+      <button class="alert-close" (click)="error = ''">&times;</button>
+    </div>
+
+    <div class="alert-banner alert-warning" *ngIf="!backendConnected">
+      <span class="alert-icon">🔌</span>
+      <div class="alert-text">
+        <strong>Spring Boot backend not reachable on http://localhost:8080.</strong>
+        Ensure your backend application is running.
+      </div>
+      <button class="btn btn-sm btn-secondary" (click)="refreshAll()">Retry Connection</button>
+    </div>
+
+    <!-- TAB 1: OVERVIEW / DASHBOARD -->
+    <ng-container *ngIf="tab === 'overview'">
+      <!-- Hero Banner -->
+      <section class="dashboard-hero">
+        <div class="hero-content">
+          <div class="hero-badge">DYNAMIC INVENTORY &amp; PRICING MANAGEMENT</div>
+          <h2>Intelligent Inventory Monitoring<br>&amp; Real-Time Commerce</h2>
+          <p>
+            Track stock levels, evaluate algorithm recommendations, and make automated pricing &amp; reordering decisions based on real-time demand.
+          </p>
+          <div class="hero-buttons">
+            <button class="btn btn-light" (click)="setTab('products')">View Product Catalog &rarr;</button>
+            <button class="btn btn-outline-light" (click)="setTab('pricing')">Pending Pricing ({{ pendingPricingCount }})</button>
+          </div>
+        </div>
+
+        <div class="hero-metrics-side">
+          <div class="hero-kpi-card">
+            <span class="kpi-label">INVENTORY VALUATION</span>
+            <strong class="kpi-val">{{ totalInventoryValuation | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <small>Across {{ totalStockUnits | number }} physical units</small>
+          </div>
+          <div class="hero-status-row">
+            <div class="status-indicator-box">
+              <span class="indicator-dot green"></span>
+              <span><strong>{{ products.length - lowStockCount - outOfStockCount }}</strong> Optimal</span>
+            </div>
+            <div class="status-indicator-box">
+              <span class="indicator-dot amber"></span>
+              <span><strong>{{ lowStockCount }}</strong> Low Stock</span>
+            </div>
+            <div class="status-indicator-box">
+              <span class="indicator-dot red"></span>
+              <span><strong>{{ outOfStockCount }}</strong> Depleted</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- KPI Metric Cards Grid -->
+      <section class="kpi-grid">
+        <article class="kpi-card">
+          <div class="kpi-header">
+            <span>Total Catalog Products</span>
+            <span class="kpi-icon indigo">📦</span>
+          </div>
+          <strong class="kpi-value">{{ totalProducts }}</strong>
+          <div class="kpi-footer">
+            <span class="trend neutral">{{ totalStockUnits | number }} total units in stock</span>
+          </div>
+        </article>
+
+        <article class="kpi-card" [class.highlight-warning]="lowStockCount > 0">
+          <div class="kpi-header">
+            <span>Low Stock Alerts</span>
+            <span class="kpi-icon amber">⚠️</span>
+          </div>
+          <strong class="kpi-value text-amber">{{ lowStockCount }}</strong>
+          <div class="kpi-footer">
+            <span class="trend warning">&le; configured reorder thresholds</span>
+          </div>
+        </article>
+
+        <article class="kpi-card" [class.highlight-alert]="pendingPricingCount > 0">
+          <div class="kpi-header">
+            <span>Pending Pricing</span>
+            <span class="kpi-icon blue">🏷️</span>
+          </div>
+          <strong class="kpi-value text-blue">{{ pendingPricingCount }}</strong>
+          <div class="kpi-footer">
+            <span class="trend blue" (click)="setTab('pricing')">Review recommendations &rarr;</span>
+          </div>
+        </article>
+
+        <article class="kpi-card" [class.highlight-alert]="pendingReorderCount > 0">
+          <div class="kpi-header">
+            <span>Pending Reorders</span>
+            <span class="kpi-icon emerald">🔄</span>
+          </div>
+          <strong class="kpi-value text-emerald">{{ pendingReorderCount }}</strong>
+          <div class="kpi-footer">
+            <span class="trend emerald" (click)="setTab('reorder')">Review replenishment &rarr;</span>
+          </div>
+        </article>
+      </section>
+
+      <!-- Dashboard Main Content Grid -->
+      <section class="dashboard-grid">
+        <!-- Watchlist: Low Stock & Critical Products -->
+        <article class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Inventory Watchlist</h3>
+              <p class="card-subtitle">Products requiring attention based on reorder thresholds</p>
+            </div>
+            <button class="btn btn-link" (click)="setTab('products')">View Full Catalog &rarr;</button>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>PRODUCT</th>
+                  <th>CATEGORY</th>
+                  <th>STOCK LEVEL</th>
+                  <th>PRICE</th>
+                  <th>STATUS</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let p of lowStockProducts.slice(0, 5); trackBy: trackProduct">
+                  <td>
+                    <div class="product-identity">
+                      <div class="avatar-box">{{ p.name.charAt(0) }}</div>
+                      <div>
+                        <strong>{{ p.name }}</strong>
+                        <small class="muted">{{ p.sku }}</small>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span class="category-badge">{{ p.category }}</span></td>
+                  <td>
+                    <div class="stock-meter-wrap">
+                      <div class="stock-numbers">
+                        <strong [class.text-red]="p.stockLevel === 0" [class.text-amber]="p.stockLevel <= p.reorderThreshold">
+                          {{ p.stockLevel }} units
+                        </strong>
+                        <small class="muted">/ threshold {{ p.reorderThreshold }}</small>
+                      </div>
+                      <div class="progress-track">
+                        <div class="progress-bar"
+                             [style.width.%]="stockBarWidth(p)"
+                             [class.bar-red]="p.stockLevel === 0"
+                             [class.bar-amber]="p.stockLevel > 0 && p.stockLevel <= p.reorderThreshold"
+                             [class.bar-green]="p.stockLevel > p.reorderThreshold">
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><strong>{{ p.currentPrice | currency }}</strong></td>
+                  <td>
+                    <span class="badge" [ngClass]="p.status.toLowerCase()">
+                      {{ p.status.replaceAll('_', ' ') }}
+                    </span>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline" (click)="viewProduct(p.id)">Details</button>
+                  </td>
+                </tr>
+                <tr *ngIf="lowStockProducts.length === 0">
+                  <td colspan="6" class="empty-cell">
+                    <div class="empty-state-mini">
+                      <span>🎉</span>
+                      <p>All products have healthy inventory levels above their reorder thresholds.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- Right Side: Pending Suggestions Stream & Fast Actions -->
+        <div class="dashboard-side-col">
+          <!-- Pending Pricing Review Box -->
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Pending Pricing Actions</h3>
+                <p class="card-subtitle">{{ pendingPricingCount }} recommendations awaiting review</p>
+              </div>
+              <button class="btn btn-link" (click)="setTab('pricing')">View All &rarr;</button>
+            </div>
+            <div class="stream-list" *ngIf="recentPricingSuggestions.length > 0">
+              <div class="stream-item" *ngFor="let s of recentPricingSuggestions; trackBy: trackPricing">
+                <div class="stream-icon" [class.arrow-up]="s.direction === 'INCREASE'" [class.arrow-down]="s.direction === 'DECREASE'">
+                  {{ s.direction === 'INCREASE' ? '↗' : s.direction === 'DECREASE' ? '↘' : '→' }}
+                </div>
+                <div class="stream-info">
+                  <strong>{{ s.product.name }}</strong>
+                  <div class="price-flow">
+                    <span>{{ s.currentPrice | currency }}</span>
+                    <span class="flow-arrow">&rarr;</span>
+                    <strong class="target-price">{{ s.recommendedPrice | currency }}</strong>
+                    <span class="direction-pill" [class.increase]="s.direction === 'INCREASE'">
+                      {{ s.direction }}
+                    </span>
+                  </div>
+                </div>
+                <button class="btn btn-xs btn-primary" (click)="openConfirmPricing(s, 'ACCEPTED')" *ngIf="s.status === 'PENDING'">
+                  Accept
+                </button>
+              </div>
+            </div>
+            <div class="empty-state-mini" *ngIf="recentPricingSuggestions.length === 0">
+              <p>No pricing recommendations currently pending review.</p>
+            </div>
+          </article>
+
+          <!-- Quick Actions & Automation Info -->
+          <article class="card quick-actions-card">
+            <div class="card-header">
+              <h3 class="card-title">Quick Operations</h3>
+            </div>
+            <div class="action-tiles">
+              <button class="action-tile" (click)="setTab('products'); showCreateForm = true">
+                <span class="tile-icon">+</span>
+                <span>Add Product</span>
+              </button>
+              <button class="action-tile" (click)="setTab('pricing')">
+                <span class="tile-icon">🏷️</span>
+                <span>Pricing Queue</span>
+              </button>
+              <button class="action-tile" (click)="setTab('reorder')">
+                <span class="tile-icon">🔄</span>
+                <span>Reorder Queue</span>
+              </button>
+              <button class="action-tile" (click)="setTab('strategy')">
+                <span class="tile-icon">⚙️</span>
+                <span>Engine Config</span>
+              </button>
+            </div>
+            <div class="system-tip">
+              <strong>Reactive Suggestions:</strong> Updating stock levels below threshold or processing sales automatically fires asynchronous inventory events that trigger the {{ strategy }} advisor.
+            </div>
+          </article>
+        </div>
+      </section>
+    </ng-container>
+
+    <!-- TAB 2: PRODUCT MANAGEMENT -->
+    <ng-container *ngIf="tab === 'products'">
+      <!-- Search & Filters Bar -->
+      <section class="card filter-bar">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text"
+                 [(ngModel)]="productSearchQuery"
+                 placeholder="Search by product name or SKU..."
+                 class="form-control search-field" />
+          <button class="clear-search" *ngIf="productSearchQuery" (click)="productSearchQuery = ''">&times;</button>
+        </div>
+
+        <div class="filter-group">
+          <label for="categoryFilter">Category</label>
+          <select id="categoryFilter" class="form-control" [(ngModel)]="productCategoryFilter" (change)="loadProducts()">
+            <option value="">All Categories</option>
+            <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter" class="form-control" [(ngModel)]="productStatusFilter" (change)="loadProducts()">
+            <option value="">All Statuses</option>
+            <option *ngFor="let st of productStatuses" [value]="st">{{ st.replaceAll('_', ' ') }}</option>
+          </select>
+        </div>
+
+        <div class="filter-summary">
+          <span>Showing <strong>{{ filteredProducts.length }}</strong> of {{ products.length }} items</span>
+        </div>
+      </section>
+
+      <!-- Create Product Form Modal / Collapsible -->
+      <section class="card create-product-box" *ngIf="showCreateForm">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Add New Catalog Product</h3>
+            <p class="card-subtitle">Register inventory item with pricing, thresholds, and demand parameters</p>
+          </div>
+          <button class="btn-close" (click)="showCreateForm = false">&times;</button>
+        </div>
+
+        <form (ngSubmit)="createProduct()" class="product-form-grid">
+          <div class="form-field">
+            <label for="newSku">SKU Code *</label>
+            <input id="newSku" type="text" class="form-control" [(ngModel)]="createForm.sku" name="sku" required placeholder="e.g. SKU-TECH-001" />
+          </div>
+
+          <div class="form-field">
+            <label for="newName">Product Name *</label>
+            <input id="newName" type="text" class="form-control" [(ngModel)]="createForm.name" name="name" required placeholder="e.g. Noise Cancelling Headphones" />
+          </div>
+
+          <div class="form-field">
+            <label for="newCategory">Category *</label>
+            <select id="newCategory" class="form-control" [(ngModel)]="createForm.category" name="category" required>
+              <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="newPrice">Current Price ($) *</label>
+            <input id="newPrice" type="number" step="0.01" min="0.01" class="form-control" [(ngModel)]="createForm.currentPrice" name="currentPrice" required />
+          </div>
+
+          <div class="form-field">
+            <label for="newCost">Cost Price ($)</label>
+            <input id="newCost" type="number" step="0.01" min="0" class="form-control" [(ngModel)]="createForm.costPrice" name="costPrice" placeholder="Optional" />
+          </div>
+
+          <div class="form-field">
+            <label for="newStock">Initial Stock Level *</label>
+            <input id="newStock" type="number" step="1" min="0" class="form-control" [(ngModel)]="createForm.stockLevel" name="stockLevel" required />
+          </div>
+
+          <div class="form-field">
+            <label for="newThreshold">Reorder Threshold *</label>
+            <input id="newThreshold" type="number" step="1" min="0" class="form-control" [(ngModel)]="createForm.reorderThreshold" name="reorderThreshold" required />
+          </div>
+
+          <div class="form-field">
+            <label for="newVelocity">Demand Velocity (units/day) *</label>
+            <input id="newVelocity" type="number" step="1" min="0" class="form-control" [(ngModel)]="createForm.demandVelocity" name="demandVelocity" required />
+          </div>
+
+          <div class="form-actions-full">
+            <button type="button" class="btn btn-secondary" (click)="showCreateForm = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="saving">
+              {{ saving ? 'Creating Product...' : 'Create Product' }}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Product List Table -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Inventory Catalog</h3>
+            <p class="card-subtitle">Manage stock levels, simulate order fulfillment, and request recommendations</p>
+          </div>
+          <button class="btn btn-outline" (click)="loadProducts()" [disabled]="loading">
+            ↻ Reload Products
+          </button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>PRODUCT DETAILS</th>
+                <th>CATEGORY</th>
+                <th>CURRENT PRICE</th>
+                <th>STOCK / THRESHOLD</th>
+                <th>DEMAND</th>
+                <th>STATUS</th>
+                <th>INVENTORY MUTATIONS</th>
+                <th>COMMERCE ADVISOR</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of filteredProducts; trackBy: trackProduct">
+                <!-- Product Details -->
+                <td>
+                  <div class="product-identity">
+                    <div class="avatar-box">{{ p.name.charAt(0) }}</div>
+                    <div>
+                      <button class="product-name-link" (click)="viewProduct(p.id)">
+                        {{ p.name }}
+                      </button>
+                      <div class="product-sku-id">
+                        <span class="sku-code">{{ p.sku }}</span>
+                        <span class="id-tag">#{{ p.id }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Category -->
+                <td>
+                  <span class="category-badge">{{ p.category }}</span>
+                </td>
+
+                <!-- Price -->
+                <td>
+                  <div class="price-stack">
+                    <strong class="item-price">{{ p.currentPrice | currency }}</strong>
+                    <small class="muted" *ngIf="p.costPrice">Cost: {{ p.costPrice | currency }}</small>
+                  </div>
+                </td>
+
+                <!-- Stock & Progress -->
+                <td>
+                  <div class="stock-meter-wrap">
+                    <div class="stock-numbers">
+                      <strong [class.text-red]="p.stockLevel === 0" [class.text-amber]="p.stockLevel > 0 && p.stockLevel <= p.reorderThreshold">
+                        {{ p.stockLevel }} units
+                      </strong>
+                      <small class="muted">/ threshold {{ p.reorderThreshold }}</small>
+                    </div>
+                    <div class="progress-track">
+                      <div class="progress-bar"
+                           [style.width.%]="stockBarWidth(p)"
+                           [class.bar-red]="p.stockLevel === 0"
+                           [class.bar-amber]="p.stockLevel > 0 && p.stockLevel <= p.reorderThreshold"
+                           [class.bar-green]="p.stockLevel > p.reorderThreshold">
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Demand Velocity -->
+                <td>
+                  <div class="velocity-badge">
+                    <span>{{ p.demandVelocity }}</span>
+                    <small>units/day</small>
+                  </div>
+                </td>
+
+                <!-- Status -->
+                <td>
+                  <span class="badge" [ngClass]="p.status.toLowerCase()">
+                    {{ p.status.replaceAll('_', ' ') }}
+                  </span>
+                </td>
+
+                <!-- Stock Mutations: Update Stock & Process Sale -->
+                <td>
+                  <div class="mutation-actions">
+                    <div class="mutation-row">
+                      <input type="number"
+                             min="0"
+                             step="1"
+                             class="input-compact"
+                             [(ngModel)]="stockEdit[p.id]"
+                             title="New stock quantity" />
+                      <button class="btn btn-xs btn-secondary"
+                              [disabled]="actionBusy['stock-' + p.id]"
+                              (click)="updateStock(p)">
+                        {{ actionBusy['stock-' + p.id] ? '...' : 'Set Stock' }}
+                      </button>
+                    </div>
+
+                    <div class="mutation-row sale-row">
+                      <input type="number"
+                             min="1"
+                             step="1"
+                             class="input-compact"
+                             [(ngModel)]="saleQuantity[p.id]"
+                             title="Order fulfillment quantity" />
+                      <button class="btn btn-xs btn-success"
+                              [disabled]="actionBusy['sale-' + p.id] || p.stockLevel === 0"
+                              (click)="processSale(p)">
+                        {{ actionBusy['sale-' + p.id] ? '...' : 'Sell' }}
+                      </button>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Advisor Triggers -->
+                <td>
+                  <div class="advisor-btn-stack">
+                    <button class="btn btn-xs btn-advisor"
+                            [disabled]="actionBusy['price-' + p.id]"
+                            (click)="generatePricing(p)"
+                            title="Generate pricing recommendation via advisor">
+                      {{ actionBusy['price-' + p.id] ? 'Generating...' : '⚡ Price Rec' }}
+                    </button>
+                    <button class="btn btn-xs btn-advisor"
+                            [disabled]="actionBusy['reorder-' + p.id]"
+                            (click)="generateReorder(p)"
+                            title="Generate replenishment recommendation via advisor">
+                      {{ actionBusy['reorder-' + p.id] ? 'Generating...' : '⚡ Reorder Rec' }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <tr *ngIf="filteredProducts.length === 0">
+                <td colspan="8" class="empty-cell">
+                  <div class="empty-state-large">
+                    <span>🔍</span>
+                    <h4>No products match your criteria</h4>
+                    <p>Try clearing filters or search query, or add a new product.</p>
+                    <button class="btn btn-secondary" (click)="productSearchQuery = ''; productCategoryFilter = ''; productStatusFilter = ''">
+                      Reset Filters
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </ng-container>
+
+    <!-- TAB 3: PRICING SUGGESTIONS -->
+    <ng-container *ngIf="tab === 'pricing'">
+      <section class="card filter-bar">
+        <div class="filter-tabs">
+          <button *ngFor="let s of suggestionStatuses"
+                  class="filter-tab-btn"
+                  [class.active]="pricingStatusFilter === s"
+                  (click)="pricingStatusFilter = s; loadPricing()">
+            {{ s }}
+            <span class="tab-count" *ngIf="s === 'PENDING' && pendingPricingCount > 0">{{ pendingPricingCount }}</span>
+          </button>
+        </div>
+
+        <div class="filter-summary">
+          <span>Found <strong>{{ pricingSuggestions.length }}</strong> pricing recommendations</span>
+          <button class="btn btn-sm btn-outline" (click)="loadPricing()" [disabled]="loading">
+            ↻ Refresh
+          </button>
+        </div>
+      </section>
+
+      <!-- Suggestions Cards Grid -->
+      <section class="cards-grid" *ngIf="pricingSuggestions.length > 0">
+        <article class="suggestion-card" *ngFor="let s of pricingSuggestions; trackBy: trackPricing">
+          <div class="suggestion-card-header">
+            <div class="suggestion-id-tag">
+              <span class="type-pill pricing">PRICING SUGGESTION #{{ s.id }}</span>
+              <span class="trigger-pill">{{ s.triggerReason.replaceAll('_', ' ') }}</span>
+            </div>
+            <span class="badge" [ngClass]="s.status.toLowerCase()">{{ s.status }}</span>
+          </div>
+
+          <!-- Associated Product -->
+          <div class="product-identity card-product-row">
+            <div class="avatar-box large">{{ s.product.name.charAt(0) }}</div>
+            <div>
+              <h4 class="card-product-title">{{ s.product.name }}</h4>
+              <small class="muted">{{ s.product.sku }} &bull; {{ s.product.category }} &bull; Current Stock: {{ s.product.stockLevel }}</small>
+            </div>
+          </div>
+
+          <!-- Price Recommendation Visual Diff -->
+          <div class="price-differential-box">
+            <div class="price-side current">
+              <span class="diff-label">CURRENT PRICE</span>
+              <strong class="diff-value">{{ s.currentPrice | currency }}</strong>
+            </div>
+
+            <div class="diff-direction-pill" [class.direction-up]="s.direction === 'INCREASE'" [class.direction-down]="s.direction === 'DECREASE'">
+              <span class="dir-symbol">
+                {{ s.direction === 'INCREASE' ? '▲' : s.direction === 'DECREASE' ? '▼' : '●' }}
+              </span>
+              <span class="dir-text">
+                {{ calculatePriceDiff(s).percent >= 0 ? '+' : '' }}{{ calculatePriceDiff(s).percent | number:'1.1-1' }}%
+              </span>
+            </div>
+
+            <div class="price-side recommended">
+              <span class="diff-label">RECOMMENDED</span>
+              <strong class="diff-value text-accent">{{ s.recommendedPrice | currency }}</strong>
+            </div>
+          </div>
+
+          <!-- Confidence & Reasoning -->
+          <div class="suggestion-meta-row">
+            <div class="confidence-indicator">
+              <span class="meta-label">Confidence Score</span>
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar" [style.width.%]="s.confidence * 100"></div>
+              </div>
+              <strong class="confidence-num">{{ (s.confidence * 100) | number:'1.0-0' }}%</strong>
+            </div>
+            <div class="date-stamp">
+              {{ s.createdAt | date:'medium' }}
+            </div>
+          </div>
+
+          <div class="reasoning-box">
+            <span class="reasoning-quote">&ldquo;</span>
+            <p>{{ s.reasoning }}</p>
+          </div>
+
+          <!-- Card Actions (Confirmation Dialog Triggers) -->
+          <div class="suggestion-card-footer">
+            <ng-container *ngIf="s.status === 'PENDING'; else statusHandled">
+              <button class="btn btn-sm btn-outline-danger"
+                      [disabled]="actionBusy['pricing-' + s.id]"
+                      (click)="openConfirmPricing(s, 'REJECTED')">
+                Reject
+              </button>
+              <button class="btn btn-sm btn-success"
+                      [disabled]="actionBusy['pricing-' + s.id]"
+                      (click)="openConfirmPricing(s, 'ACCEPTED')">
+                Accept Recommended Price
+              </button>
+            </ng-container>
+            <ng-template #statusHandled>
+              <div class="handled-message">
+                <span>{{ s.status === 'ACCEPTED' ? '✓ Accepted & Applied to Product' : '✕ Rejected Recommendation' }}</span>
+              </div>
+            </ng-template>
+          </div>
+        </article>
+      </section>
+
+      <!-- Empty State -->
+      <div class="card empty-state-box" *ngIf="pricingSuggestions.length === 0">
+        <span class="empty-icon">🏷️</span>
+        <h3>No Pricing Suggestions Found</h3>
+        <p>No pricing recommendations match status "{{ pricingStatusFilter }}". You can trigger recommendations from the product catalog.</p>
+        <button class="btn btn-primary" (click)="setTab('products')">Go to Product Catalog</button>
+      </div>
+    </ng-container>
+
+    <!-- TAB 4: REORDER SUGGESTIONS -->
+    <ng-container *ngIf="tab === 'reorder'">
+      <section class="card filter-bar">
+        <div class="filter-tabs">
+          <button *ngFor="let s of suggestionStatuses"
+                  class="filter-tab-btn"
+                  [class.active]="reorderStatusFilter === s"
+                  (click)="reorderStatusFilter = s; loadReorder()">
+            {{ s }}
+            <span class="tab-count" *ngIf="s === 'PENDING' && pendingReorderCount > 0">{{ pendingReorderCount }}</span>
+          </button>
+        </div>
+
+        <div class="filter-summary">
+          <span>Found <strong>{{ reorderSuggestions.length }}</strong> replenishment recommendations</span>
+          <button class="btn btn-sm btn-outline" (click)="loadReorder()" [disabled]="loading">
+            ↻ Refresh
+          </button>
+        </div>
+      </section>
+
+      <!-- Suggestions Cards Grid -->
+      <section class="cards-grid" *ngIf="reorderSuggestions.length > 0">
+        <article class="suggestion-card" *ngFor="let s of reorderSuggestions; trackBy: trackReorder">
+          <div class="suggestion-card-header">
+            <div class="suggestion-id-tag">
+              <span class="type-pill reorder">REPLENISHMENT #{{ s.id }}</span>
+              <span class="trigger-pill">{{ s.triggerReason.replaceAll('_', ' ') }}</span>
+            </div>
+            <span class="badge" [ngClass]="s.status.toLowerCase()">{{ s.status }}</span>
+          </div>
+
+          <!-- Associated Product -->
+          <div class="product-identity card-product-row">
+            <div class="avatar-box large">{{ s.product.name.charAt(0) }}</div>
+            <div>
+              <h4 class="card-product-title">{{ s.product.name }}</h4>
+              <small class="muted">{{ s.product.sku }} &bull; {{ s.product.category }} &bull; Threshold: {{ s.product.reorderThreshold }}</small>
+            </div>
+          </div>
+
+          <!-- Reorder Metrics Block -->
+          <div class="reorder-specs-grid">
+            <div class="spec-tile">
+              <small class="spec-label">CURRENT STOCK</small>
+              <strong class="spec-val">{{ s.currentStock }}</strong>
+              <small class="spec-sub">units</small>
+            </div>
+
+            <div class="spec-tile highlight-emerald">
+              <small class="spec-label">ORDER QUANTITY</small>
+              <strong class="spec-val text-emerald">+{{ s.recommendedQuantity }}</strong>
+              <small class="spec-sub">recommended units</small>
+            </div>
+
+            <div class="spec-tile">
+              <small class="spec-label">PROJECTED STOCK</small>
+              <strong class="spec-val">{{ (s.currentStock || 0) + (s.recommendedQuantity || 0) }}</strong>
+              <small class="spec-sub">total units</small>
+            </div>
+
+            <div class="spec-tile">
+              <small class="spec-label">EST. LEAD TIME</small>
+              <strong class="spec-val">{{ s.suggestedLeadTimeDays }}</strong>
+              <small class="spec-sub">business days</small>
+            </div>
+          </div>
+
+          <!-- Confidence & Reasoning -->
+          <div class="suggestion-meta-row">
+            <div class="confidence-indicator">
+              <span class="meta-label">Confidence Score</span>
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar bar-emerald" [style.width.%]="s.confidence * 100"></div>
+              </div>
+              <strong class="confidence-num">{{ (s.confidence * 100) | number:'1.0-0' }}%</strong>
+            </div>
+            <div class="date-stamp">
+              {{ s.createdAt | date:'medium' }}
+            </div>
+          </div>
+
+          <div class="reasoning-box">
+            <span class="reasoning-quote">&ldquo;</span>
+            <p>{{ s.reasoning }}</p>
+          </div>
+
+          <!-- Card Actions (Confirmation Dialog Triggers) -->
+          <div class="suggestion-card-footer">
+            <ng-container *ngIf="s.status === 'PENDING'; else reorderStatusHandled">
+              <button class="btn btn-sm btn-outline-danger"
+                      [disabled]="actionBusy['reorder-' + s.id]"
+                      (click)="openConfirmReorder(s, 'REJECTED')">
+                Reject
+              </button>
+              <button class="btn btn-sm btn-primary"
+                      [disabled]="actionBusy['reorder-' + s.id]"
+                      (click)="openConfirmReorder(s, 'ACCEPTED')">
+                Approve Replenishment Order
+              </button>
+            </ng-container>
+            <ng-template #reorderStatusHandled>
+              <div class="handled-message">
+                <span>{{ s.status === 'ACCEPTED' ? '✓ Order Approved & Stock Added' : '✕ Replenishment Rejected' }}</span>
+              </div>
+            </ng-template>
+          </div>
+        </article>
+      </section>
+
+      <!-- Empty State -->
+      <div class="card empty-state-box" *ngIf="reorderSuggestions.length === 0">
+        <span class="empty-icon">🔄</span>
+        <h3>No Reorder Suggestions Found</h3>
+        <p>No replenishment recommendations match status "{{ reorderStatusFilter }}". Suggestions can be triggered when stock drops below threshold.</p>
+        <button class="btn btn-primary" (click)="setTab('products')">Go to Product Catalog</button>
+      </div>
+    </ng-container>
+
+    <!-- TAB 5: STRATEGY CONFIGURATION -->
+    <ng-container *ngIf="tab === 'strategy'">
+      <section class="strategy-page-container">
+        <div class="card strategy-overview-card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Commerce Advisor Strategy Engine</h3>
+              <p class="card-subtitle">Select the intelligence advisor backend that calculates pricing and reorder suggestions</p>
+            </div>
+            <div class="active-badge-wrap">
+              <span class="badge-prefix">CURRENT ACTIVE:</span>
+              <span class="badge active-strategy-pill" [class.ai-pill]="strategy === 'AI'">
+                {{ strategy === 'AI' ? '🤖 AI LLM Advisor' : '📐 Rule-Based Engine' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="strategy-selector-grid">
+            <!-- Strategy 1: RULE -->
+            <div class="strategy-option-card"
+                 [class.selected]="selectedStrategy === 'RULE'"
+                 (click)="selectedStrategy = 'RULE'">
+              <div class="option-header">
+                <div class="option-radio" [class.checked]="selectedStrategy === 'RULE'"></div>
+                <h4>Rule-Based Engine (Deterministic)</h4>
+                <span class="option-tag">BUILT-IN</span>
+              </div>
+              <p class="option-description">
+                Fast, predictable, and deterministic rule algorithms that analyze inventory ratios and demand statistics:
+              </p>
+              <ul class="option-feature-list">
+                <li><strong>Pricing Rule:</strong> If stock is at or below reorder threshold, recommends a <strong>+10% price increase</strong> to regulate depletion.</li>
+                <li><strong>Demand Spike Rule:</strong> If demand velocity exceeds 3x category average, recommends a <strong>+5% price increase</strong>.</li>
+                <li><strong>Replenishment Formula:</strong> Recommends reorder quantity = <code>max(1, reorderThreshold &times; 3 - currentStock)</code>.</li>
+                <li>Zero external API dependencies; runs locally on the Spring Boot server.</li>
+              </ul>
+            </div>
+
+            <!-- Strategy 2: AI -->
+            <div class="strategy-option-card"
+                 [class.selected]="selectedStrategy === 'AI'"
+                 (click)="selectedStrategy = 'AI'">
+              <div class="option-header">
+                <div class="option-radio" [class.checked]="selectedStrategy === 'AI'"></div>
+                <h4>AI Advisor (LLM Powered)</h4>
+                <span class="option-tag ai-tag">INTELLIGENT</span>
+              </div>
+              <p class="option-description">
+                Powered by a LiteLLM/OpenAI-compatible language model configured in Spring Boot:
+              </p>
+              <ul class="option-feature-list">
+                <li>Analyzes product category context, demand elasticity, and market conditions.</li>
+                <li>Synthesizes natural language reasoning explaining economic trade-offs.</li>
+                <li>Outputs confidence scores and recommended lead time projections.</li>
+                <li>Gracefully falls back to Rule-Based Advisor if LLM credentials are unavailable.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="strategy-save-panel">
+            <div class="save-status-info">
+              <span>Selected for apply: <strong>{{ selectedStrategy }}</strong></span>
+              <span *ngIf="selectedStrategy !== strategy" class="unsaved-warning">(Unsaved changes)</span>
+            </div>
+            <div class="save-actions">
+              <button class="btn btn-secondary" (click)="loadStrategy()" [disabled]="strategySaving">
+                Cancel / Reset
+              </button>
+              <button class="btn btn-primary" (click)="changeStrategy()" [disabled]="strategySaving">
+                {{ strategySaving ? 'Applying Engine Configuration...' : 'Apply Strategy' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Technical Integration Specs -->
+        <div class="card api-docs-card">
+          <div class="card-header">
+            <h4 class="card-title">Backend Integration Specifications</h4>
+          </div>
+          <div class="docs-grid">
+            <div class="doc-item">
+              <span class="http-badge get">GET</span>
+              <code>/config/strategy</code>
+              <small>Reads the currently configured CommerceStrategy enum (RULE | AI).</small>
+            </div>
+            <div class="doc-item">
+              <span class="http-badge put">PUT</span>
+              <code>/config/strategy</code>
+              <small>Updates strategy singleton in <code>CommerceStrategyHolder</code>.</small>
+            </div>
+            <div class="doc-item">
+              <span class="http-badge post">POST</span>
+              <code>/products/&#123;id&#125;/suggest-pricing</code>
+              <small>Dispatches generation to active <code>CommerceAdvisorFactory</code>.</small>
+            </div>
+            <div class="doc-item">
+              <span class="http-badge post">POST</span>
+              <code>/products/&#123;id&#125;/suggest-reorder</code>
+              <small>Dispatches reorder replenishment calculation to active advisor.</small>
+            </div>
+          </div>
+        </div>
+      </section>
+    </ng-container>
+
+    <!-- Global Footer -->
+    <footer class="app-footer">
+      <div>StockPulse &copy; Enterprise Inventory &amp; Dynamic Pricing Operations</div>
+      <div class="footer-links">
+        <span>Angular 18 &bull; Spring Boot REST API &bull; Port 8080</span>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- 1. Confirmation Dialog Modal -->
+<div class="modal-backdrop" *ngIf="confirmDialog" (click)="cancelConfirm()">
+  <div class="modal-card confirm-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="confirm-icon-wrap" [class.danger]="confirmDialog.confirmVariant === 'danger'" [class.success]="confirmDialog.confirmVariant === 'success'">
+        {{ confirmDialog.confirmVariant === 'danger' ? '⚠️' : '✓' }}
+      </div>
+      <div>
+        <h3 class="modal-title">{{ confirmDialog.title }}</h3>
+        <p class="modal-subtitle">{{ confirmDialog.message }}</p>
+      </div>
+    </div>
+
+    <div class="confirm-meta-table" *ngIf="confirmDialog.meta && confirmDialog.meta.length > 0">
+      <div class="meta-row" *ngFor="let m of confirmDialog.meta">
+        <span class="meta-key">{{ m.label }}</span>
+        <strong class="meta-val">{{ m.value }}</strong>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" [disabled]="confirmBusy" (click)="cancelConfirm()">
+        Cancel
+      </button>
+      <button class="btn"
+              [class.btn-primary]="confirmDialog.confirmVariant === 'primary'"
+              [class.btn-success]="confirmDialog.confirmVariant === 'success'"
+              [class.btn-danger]="confirmDialog.confirmVariant === 'danger'"
+              [disabled]="confirmBusy"
+              (click)="executeConfirm()">
+        {{ confirmBusy ? 'Processing...' : confirmDialog.confirmLabel }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Product Details Modal -->
+<div class="modal-backdrop" *ngIf="selectedProduct" (click)="closeProductDetails()">
+  <div class="modal-card detail-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="product-identity">
+        <div class="avatar-box large">{{ selectedProduct.name.charAt(0) }}</div>
+        <div>
+          <span class="eyebrow">PRODUCT DETAILS &bull; ID #{{ selectedProduct.id }}</span>
+          <h3 class="modal-title">{{ selectedProduct.name }}</h3>
+        </div>
+      </div>
+      <button class="btn-close" (click)="closeProductDetails()">&times;</button>
+    </div>
+
+    <div class="detail-specs-grid">
+      <div class="spec-block">
+        <small>SKU CODE</small>
+        <strong>{{ selectedProduct.sku }}</strong>
+      </div>
+      <div class="spec-block">
+        <small>CATEGORY</small>
+        <strong>{{ selectedProduct.category }}</strong>
+      </div>
+      <div class="spec-block">
+        <small>CURRENT PRICE</small>
+        <strong class="text-accent">{{ selectedProduct.currentPrice | currency }}</strong>
+      </div>
+      <div class="spec-block">
+        <small>COST PRICE</small>
+        <strong>{{ selectedProduct.costPrice ? (selectedProduct.costPrice | currency) : 'N/A' }}</strong>
+      </div>
+      <div class="spec-block">
+        <small>STOCK LEVEL</small>
+        <strong [class.text-red]="selectedProduct.stockLevel === 0" [class.text-amber]="selectedProduct.stockLevel <= selectedProduct.reorderThreshold">
+          {{ selectedProduct.stockLevel }} units
+        </strong>
+      </div>
+      <div class="spec-block">
+        <small>REORDER THRESHOLD</small>
+        <strong>{{ selectedProduct.reorderThreshold }} units</strong>
+      </div>
+      <div class="spec-block">
+        <small>DEMAND VELOCITY</small>
+        <strong>{{ selectedProduct.demandVelocity }} units/day</strong>
+      </div>
+      <div class="spec-block">
+        <small>LIFECYCLE STATUS</small>
+        <span class="badge" [ngClass]="selectedProduct.status.toLowerCase()">
+          {{ selectedProduct.status.replaceAll('_', ' ') }}
+        </span>
+      </div>
+    </div>
+
+    <div class="detail-analytics-box">
+      <div class="analytics-row">
+        <span>Inventory Valuation:</span>
+        <strong>{{ (selectedProduct.stockLevel * selectedProduct.currentPrice) | currency }}</strong>
+      </div>
+      <div class="analytics-row">
+        <span>Inventory Health:</span>
+        <strong [class.text-red]="selectedProduct.stockLevel === 0" [class.text-amber]="selectedProduct.stockLevel <= selectedProduct.reorderThreshold" [class.text-emerald]="selectedProduct.stockLevel > selectedProduct.reorderThreshold">
+          {{ selectedProduct.stockLevel === 0 ? 'Depleted (Out of Stock)' : selectedProduct.stockLevel <= selectedProduct.reorderThreshold ? 'Critical (Reorder Needed)' : 'Optimal' }}
+        </strong>
+      </div>
+    </div>
+
+    <div class="modal-actions-between">
+      <div class="quick-advisor-triggers">
+        <button class="btn btn-sm btn-advisor"
+                [disabled]="actionBusy['price-' + selectedProduct.id]"
+                (click)="generatePricing(selectedProduct); closeProductDetails()">
+          ⚡ Request Pricing
+        </button>
+        <button class="btn btn-sm btn-advisor"
+                [disabled]="actionBusy['reorder-' + selectedProduct.id]"
+                (click)="generateReorder(selectedProduct); closeProductDetails()">
+          ⚡ Request Reorder
+        </button>
+      </div>
+      <button class="btn btn-secondary" (click)="closeProductDetails()">Close</button>
+    </div>
+  </div>
+</div>
