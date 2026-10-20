@@ -1,47 +1,195 @@
-# ADR-001: Pluggable commerce advice and asynchronous recommendation loop
+# Architectural Decision Records (ADRs)
 
-- **Status:** Accepted for the StockPulse demo backend
-- **Date:** 2026-10-20
+## 1. Modular Monolith Architecture
 
-## Context
+**Date**: October 20, 2026  
+**Status**: Accepted
 
-StockPulse needs to turn inventory changes into pricing and replenishment suggestions, support deterministic behavior when an LLM is unavailable, and let a merchandiser approve or reject recommendations. The same advice contract must serve manual HTTP requests and automatic event handling. Recommendation generation must not extend the stock/order request latency.
+### Context
+We needed to choose between a monolithic and microservices architecture for the StockPulse application.
 
-## Decision
+### Decision
+We chose a modular monolith architecture with feature-oriented packages.
 
-### 1. One `CommerceAdvisor` contract
+### Consequences
+- **Positive**: Simpler deployment, easier development and debugging, reduced network latency
+- **Negative**: Less scalability for independent service scaling, tighter coupling between features
 
-`CommerceAdvisor` returns both a `PricingSuggestion` and a `ReorderSuggestion`. `RuleBasedCommerceAdvisor` provides a deterministic baseline; `AiCommerceAdvisor` calls an OpenAI-compatible gateway and validates structured output. `CommerceAdvisorFactory` selects the active implementation from `CommerceStrategyHolder`, an atomic runtime setting (`RULE` or `AI`). This avoids duplicated caller logic and makes future advisors register behind the same contract.
+## 2. H2 In-Memory Database
 
-### 2. Validate AI output and fail safely
+**Date**: October 20, 2026  
+**Status**: Accepted
 
-AI output is parsed as JSON. Recommended prices must be positive and within 0.5×–2× the current price, the direction must agree with the actual price delta, confidence must be in [0, 1], and reorder quantity must be a positive bounded integer. Gateway timeouts, malformed responses, or invalid output use the rule-based implementation instead of silently dropping the recommendation. The API key is supplied through environment configuration, never source control.
+### Context
+We needed a database solution for rapid development and testing.
 
-### 3. Publish inventory events after transaction commit
+### Decision
+We chose H2 in-memory database for development purposes.
 
-Stock updates and simulated sales persist first. `InventoryEventService` publishes an event and `InventoryEventListener` processes it asynchronously after commit. Both pricing and reorder suggestions are generated in that path. This keeps the write API independent from LLM latency and avoids a listener reading uncommitted product state.
+### Consequences
+- **Positive**: Zero setup, fast performance, easy testing
+- **Negative**: Data is lost on application restart, not suitable for production
 
-### 4. Human approval is the state transition boundary
+## 3. Separate Entities for Pricing and Reorder Suggestions
 
-Suggestions start as `PENDING` and may transition only to `ACCEPTED` or `REJECTED`. Acceptance has a domain side effect: pricing acceptance updates product price, while reorder acceptance increments stock. Product rows are locked when creating deduplicated suggestions or applying an accepted action; suggestion rows carry optimistic version fields so concurrent transitions cannot both commit successfully. Pending duplicate detection is scoped to product + trigger reason + suggestion type.
+**Date**: October 20, 2026  
+**Status**: Accepted
 
-### 5. Storage and extension points
+### Context
+We needed to decide whether to use a single suggestion entity or separate entities for pricing and reorder suggestions.
 
-The demo uses H2 in-memory storage and `create-drop` for a frictionless run. It is not a production persistence choice. `costPrice` is retained as an optional product field to support future margin floors; a future migration can add competitor prices and supplier/catalog identifiers without changing the advisor contract.
+### Decision
+We chose separate entities for pricing and reorder suggestions.
 
-## Consequences
+### Consequences
+- **Positive**: Clear separation of concerns, independent validation rules, easier maintenance
+- **Negative**: More entities to manage, potential duplication of common fields
 
-- Strategy can be changed without restarting the application.
-- Rule-only operation is available without LLM credentials.
-- Manual and automatic flows share suggestion creation and deduplication logic.
-- The current demo's demand velocity is a counter, not a true rolling 24-hour metric.
-- A production deployment should use a persistent database, schema migrations, authentication, retry/dead-letter policy for event failures, observability, and integration tests against its chosen database.
+## 4. Asynchronous Recommendation Generation
 
-## Demo workflow
+**Date**: October 20, 2026  
+**Status**: Accepted
 
-1. Create a product with `POST /products`.
-2. Simulate a sale with `POST /products/{id}/orders` or update stock with `PATCH /products/{id}/stock`.
-3. Poll `GET /suggestions/pricing?status=PENDING` and `GET /suggestions/reorder?status=PENDING`.
-4. Accept a pricing suggestion using `PATCH /pricing-suggestions/{id}` and verify `currentPrice` changed.
-5. Accept a reorder suggestion using `PATCH /reorder-suggestions/{id}` and verify stock increased.
-6. Change `/config/strategy` from `RULE` to `AI` to demonstrate runtime selection; omit AI configuration to demonstrate the fallback path.
+### Context
+We needed to decide how to handle recommendation generation triggered by inventory events.
+
+### Decision
+We chose to generate recommendations asynchronously using Spring Events and @Async.
+
+### Consequences
+- **Positive**: Non-blocking sales processing, better user experience, scalable processing
+- **Negative**: Increased complexity, potential for event loss (in-memory events), eventual consistency
+
+## 5. Deterministic Fallback Strategy
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We needed to ensure the system works even when AI services are unavailable.
+
+### Decision
+We implemented deterministic business rules as a fallback when AI integration fails or is not configured.
+
+### Consequences
+- **Positive**: System always functional, predictable behavior, easier testing
+- **Negative**: Less sophisticated recommendations compared to AI
+
+## 6. Mandatory Human Approval
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We needed to decide whether recommendations should be applied automatically or require human approval.
+
+### Decision
+We made human approval mandatory for all pricing and replenishment suggestions.
+
+### Consequences
+- **Positive**: Better control, reduced risk of incorrect decisions, compliance-friendly
+- **Negative**: Slower response time, requires user intervention
+
+## 7. In-Memory Event Limitations
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We chose Spring's in-memory event system for simplicity but acknowledged its limitations.
+
+### Decision
+We accepted the limitations of in-memory events for this implementation.
+
+### Consequences
+- **Positive**: Simple implementation, no external dependencies
+- **Negative**: Events lost on application restart, not durable, no retry mechanism
+
+## 8. Duplicate Prevention Strategy
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We needed to prevent multiple identical pending suggestions for the same product and trigger.
+
+### Decision
+We implemented a simple check in the event listener to prevent duplicate pending suggestions.
+
+### Consequences
+- **Positive**: Prevents unnecessary processing, reduces database clutter
+- **Negative**: Race conditions possible under high load, requires querying suggestions in event handler
+## 9. Unified Commerce Advisor Contract
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We needed to decide between a unified CommerceAdvisor interface or separate interfaces for pricing and reorder recommendations.
+
+### Decision
+We chose a unified CommerceAdvisor interface that handles both pricing and reorder suggestions. This allows for consistent strategy switching and shared context between related recommendations.
+
+### Consequences
+- **Positive**: Single point of strategy control, consistent API, easier implementation switching
+- **Negative**: Tighter coupling between pricing and reorder logic, less flexibility for independent evolution
+
+## 10. Manual-Only Suggestion Generation
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+The original design included automatic suggestion generation triggered by inventory events. However, business requirements emphasized manual control.
+
+### Decision
+We removed all automatic suggestion generation and made suggestion creation explicitly manual through dedicated API endpoints. Events are still published for other purposes but do not trigger suggestions.
+
+### Consequences
+- **Positive**: Explicit control over recommendation generation, prevents unwanted suggestions, clearer audit trail
+- **Negative**: Requires more user interaction, potential for missed opportunities
+
+## 11. Runtime Strategy Switching
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We needed a way to switch between rule-based and AI-based strategies without restarting the application.
+
+### Decision
+We implemented a thread-safe CommerceStrategyHolder that allows runtime switching via API endpoints. The factory reads the current strategy on each invocation.
+
+### Consequences
+- **Positive**: No downtime for strategy changes, immediate effect, easy testing of different approaches
+- **Negative**: Slight performance overhead from strategy lookup, potential for inconsistent behavior during concurrent requests
+
+## 12. LLM Failure Handling and Fallback
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We needed to ensure the system remains functional and secure when LLM providers are unavailable or return invalid responses.
+
+### Decision
+We implemented comprehensive error handling with structured validation of AI responses. Failed AI calls automatically fall back to rule-based advisors with clear indication in the reasoning.
+
+### Consequences
+- **Positive**: System always functional, transparent failure handling, protects against invalid AI outputs
+- **Negative**: More complex error handling code, potential for masking AI issues
+
+## 13. Product Lifecycle Management
+
+**Date**: October 20, 2026  
+**Status**: Accepted
+
+### Context
+We needed to manage product status transitions correctly, especially around pricing reviews and out-of-stock conditions.
+
+### Decision
+We implemented precise lifecycle rules: ACTIVE ↔ PRICE_REVIEW_PENDING ↔ ACTIVE transitions for pricing suggestions, and OUT_OF_STOCK status when stock reaches zero with proper restoration when restocked.
+
+### Consequences
+- **Positive**: Correct business state representation, prevents invalid operations
+- **Negative**: Complex state management logic, careful coordination required between suggestion acceptance and product updates
